@@ -8,14 +8,10 @@ bgc = "#292841"
 boid_count = 1
 
 
-# boid_size = (8, 10)
-# boid_speed = 5
-
-
 class Boid(object):
     size = (8, 10)
     speed = 5
-    beak_len = 1
+    beak_len = 100
 
     def __init__(self, cnv, x, y, rotation=0.0, **kwargs):
         self.pos = x, y
@@ -26,9 +22,9 @@ class Boid(object):
         self.dx = self.speed
         self.dy = self.speed
         self.beak = cnv.create_line(self.pos[0], self.pos[1],
-                                    self.beak_len * cos(self.rotation),
-                                    self.beak_len * sin(self.rotation),
-                                    tags=f"b{id(self)}",fill="white")
+                                    self.pos[0] + self.beak_len * cos(self.rotation),
+                                    self.pos[1] + self.beak_len * sin(self.rotation),
+                                    tags=f"b{id(self)}", fill="white")
 
     @staticmethod
     def get_box(x, y, size):
@@ -39,6 +35,7 @@ class Boid(object):
         return x1, y1, x2, y2
 
     def move(self):
+        self.id.coords()
         x1, y1, x2, y2 = self.cnv.bbox(self.id)
         if x1 < 0 or x2 > width:
             self.dx *= -1
