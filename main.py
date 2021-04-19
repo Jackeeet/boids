@@ -5,43 +5,32 @@ from math import cos, sin, atan2, pi
 height = 600
 width = 800
 bgc = "#292841"
-boid_count = 1
+boid_count = 100
+boid_size = (10, 24)
 
 
 class Boid(object):
-    size = (8, 10)
     speed = 5
-    beak_len = 100
 
-    def __init__(self, cnv, x, y, rotation=0.0, **kwargs):
-        self.pos = x, y
+    def __init__(self, cnv, rotation=0.0, *points, **kwargs):
         self.cnv = cnv
-        x1, y1, x2, y2 = self.get_box(x, y, self.size)
-        self.id = cnv.create_oval(x1, y1, x2, y2, tags=f"b{id(self)}", **kwargs)
+        self.id = cnv.create_polygon(*points, **kwargs)
+        self.pos = self.get_center(*points)
         self.rotation = rotation
         self.dx = self.speed
         self.dy = self.speed
-        self.beak = cnv.create_line(self.pos[0], self.pos[1],
-                                    self.pos[0] + self.beak_len * cos(self.rotation),
-                                    self.pos[1] + self.beak_len * sin(self.rotation),
-                                    tags=f"b{id(self)}", fill="white")
 
     @staticmethod
-    def get_box(x, y, size):
-        x1 = x - size[0] / 2
-        y1 = y - size[1] / 2
-        x2 = x + size[0] / 2
-        y2 = y + size[1] / 2
-        return x1, y1, x2, y2
+    def get_center(*points):
+        return 1 / 3 * sum(points[::2]), 1 / 3 * sum(points[1::2])
 
     def move(self):
-        self.id.coords()
         x1, y1, x2, y2 = self.cnv.bbox(self.id)
         if x1 < 0 or x2 > width:
             self.dx *= -1
         if y1 < 0 or y2 > height:
             self.dy *= -1
-        self.cnv.move(f"b{id(self)}", self.dx, self.dy)
+        self.cnv.move(self.id, self.dx, self.dy)
 
 
 class App(object):
@@ -62,10 +51,16 @@ class App(object):
     def init_boids(self, count):
         boids = []
         for i in range(count):
-            x = random.randint(0, width)
-            y = random.randint(0, height)
-            r = random.random()
-            boids.append(Boid(self.cnv, x, y, r, fill='white'))
+            r = random.uniform(0.0, 2 * pi)
+            xc = random.randint(0, width)
+            yc = random.randint(0, height)
+            x1 = xc + boid_size[0] / 2 * cos(pi / 2 + r)
+            y1 = yc - boid_size[0] / 2 * sin(pi / 2 + r)
+            x2 = xc + boid_size[0] / 2 * cos(-pi / 2 + r)
+            y2 = yc - boid_size[0] / 2 * sin(-pi / 2 + r)
+            x3 = xc + boid_size[1] * cos(r)
+            y3 = yc - boid_size[1] * sin(r)
+            boids.append(Boid(self.cnv, r, x1, y1, x2, y2, x3, y3, fill='white'))
         return boids
 
 
