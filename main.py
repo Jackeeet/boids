@@ -105,7 +105,14 @@ class Boid(object):
                 obs_boids.append(boid)
         return obs_boids
 
+    def get_rand_rotation(self):
+        rand = random.random();
+        if rand > 0.9:
+            angle = random.uniform(-0.1, 0.1)
+            self.alignment += angle
+
     def move(self):
+        self.get_rand_rotation()
         dx = self.speed * cos(self.alignment)
         dy = self.speed * sin(self.alignment)
         x1 = self.p1[0] + dx
