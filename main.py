@@ -1,11 +1,11 @@
 import random
 import tkinter as tk
-from math import cos, sin, atan2, pi
+from math import cos, sin, atan2, pi, sqrt
 
 height = 600
 width = 800
 bgc = "#292841"
-boid_count = 1
+boid_count = 10
 
 
 def sign(point, l_start, l_end):
@@ -22,8 +22,17 @@ def point_in_sector(point, sector):
     return not (negative and positive)
 
 
+def align(boid, all_boids):
+    neighbours = boid.get_boids_in_view(all_boids)
+    angle = 0.0
+    for b in neighbours:
+        angle += b.alignment
+    angle /= len(neighbours)
+    boid.alignment = angle
+
+
 class Boid(object):
-    speed = 2
+    speed = 5
     size = (10, 24)
     colour = "white"
     view_dist = 50
@@ -38,8 +47,6 @@ class Boid(object):
         self.p3 = (points[4], points[5])
         self.center = self.get_center(*points)
         self.alignment = rotation
-        self.dx = self.speed
-        self.dy = self.speed
 
     @classmethod
     def get_rand_boid(cls, canvas):
@@ -65,51 +72,65 @@ class Boid(object):
         self.center = self.get_center(x0, y0, x1, y1, x2, y2)
         self.cnv.coords(self.id, x0, y0, x1, y1, x2, y2)
 
-    def get_um_sector(self, xc, yc):
-        xs = xc + type(self).view_dist * cos(type(self).view_angle / 2)
-        ys = yc - type(self).view_dist * sin(type(self).view_angle / 2)
-        xe = xc + type(self).view_dist * cos(-type(self).view_angle / 2)
-        ye = yc - type(self).view_dist * sin(-type(self).view_angle / 2)
+    def get_unobs_sector(self, xc, yc):
+        xs = xc + self.view_dist * cos(self.view_angle / 2)
+        ys = yc - self.view_dist * sin(self.view_angle / 2)
+        xe = xc + self.view_dist * cos(-self.view_angle / 2)
+        ye = yc - self.view_dist * sin(-self.view_angle / 2)
         return xs, ys, xc, yc, xe, ye
 
     def rotate(self, angle):
         xc, yc = self.center
         self.alignment += angle
-        self.p1 = (xc + type(self).size[0] / 2 * cos(pi / 2 + angle),
-                   yc - type(self).size[0] / 2 * sin(pi / 2 + angle))
-        self.p2 = (xc + type(self).size[0] / 2 * cos(-pi / 2 + angle),
-                   yc - type(self).size[0] / 2 * sin(-pi / 2 + angle))
-        self.p3 = (xc + type(self).size[1] * cos(angle),
-                   yc - type(self).size[1] * sin(angle))
+        self.p1 = (xc + self.size[0] / 2 * cos(pi / 2 + angle),
+                   yc - self.size[0] / 2 * sin(pi / 2 + angle))
+        self.p2 = (xc + self.size[0] / 2 * cos(-pi / 2 + angle),
+                   yc - self.size[0] / 2 * sin(-pi / 2 + angle))
+        self.p3 = (xc + self.size[1] * cos(angle),
+                   yc - self.size[1] * sin(angle))
         self.update_coords()
 
-    def align(self):
-        pass
+    def get_distance(self, other):
+        sc = self.center
+        oc = other.center
+        r = (sc[0] - oc[0]) ** 2 + (sc[1] - oc[1]) ** 2
+        return sqrt(r)
+
+    def get_boids_in_view(self, boids):
+        obs_boids = []
+        unobs_sector = self.get_unobs_sector(*self.center)
+        for boid in boids:
+            r = self.get_distance(boid)
+            if r < self.view_dist and not point_in_sector(boid.center, unobs_sector):
+                obs_boids.append(boid)
+        return obs_boids
 
     def move(self):
-        x1 = self.p1[0] + self.dx
-        y1 = self.p1[1] + self.dy
-        x2 = self.p2[0] + self.dx
-        y2 = self.p2[1] + self.dy
-        x3 = self.p3[0] + self.dx
-        y3 = self.p3[1] + self.dy
+        dx = self.speed * cos(self.alignment)
+        dy = self.speed * sin(self.alignment)
+        x1 = self.p1[0] + dx
+        y1 = self.p1[1] + dy
+        x2 = self.p2[0] + dx
+        y2 = self.p2[1] + dy
+        x3 = self.p3[0] + dx
+        y3 = self.p3[1] + dy
 
         if x3 >= width:
-            x1 = -type(self).size[1]
-            x2 = -type(self).size[1]
+            x1 = -self.size[1]
+            x2 = -self.size[1]
             x3 = 0
         elif x3 <= 0:
-            x1 = width + type(self).size[1]
-            x2 = width + type(self).size[1]
+            x1 = width + self.size[1]
+            x2 = width + self.size[1]
             x3 = width
 
         if y3 >= height:
-            y1 = -type(self).size[1]
-            y2 = -type(self).size[1]
+            y1 = -self.size[1]
+            y2 = -self.size[1]
             y3 = 0
         elif y3 <= 0:
-            y1 = height + type(self).size[1]
-            y2 = height + type(self).size[1]
+            y1 = height + self.size[1]
+            y2 = height + self.size[1]
             y3 = height
 
         self.p1 = x1, y1
@@ -143,31 +164,3 @@ class App(object):
 root = tk.Tk()
 app = App(root)
 root.mainloop()
-
-# x1, y1, x2, y2 = self.cnv.bbox(self.id)
-# if x1 < 0 or x2 > width:
-#     self.dx *= -1
-# if y1 < 0 or y2 > height:
-#     self.dy *= -1
-# self.cnv.move(self.id, self.dx, self.dy)
-
-
-# tx = 0
-# if x < 0:
-#     tx = width
-# elif x > width:
-#     tx = -width
-# ty = 0
-# if y < 0:
-#     ty = y + height
-# elif y > height:
-#     ty = y - height
-#
-# if tx == 0 and ty == 0:
-#     self.cnv.move(self.id, self.dx, self.dy)
-# elif tx != 0 and ty != 0:
-#     self.cnv.move(self.id, tx, ty)
-# elif ty == 0:
-#     self.cnv.move(self.id, tx, self.dy)
-# else:
-#     self.cnv.move(self.id, self.dx, ty)
