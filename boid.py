@@ -1,8 +1,10 @@
 import random
 from math import pi, cos, sin, sqrt
 
+import boid_utils as bu
 
-class Boid(object):
+
+class Boid:
     speed = 2
     size = (10, 24)
     colour = "white"
@@ -17,16 +19,12 @@ class Boid(object):
         self.p1 = (points[0], points[1])
         self.p2 = (points[2], points[3])
         self.p3 = (points[4], points[5])
-        self.center = self.get_center(*points)
+        self.center = bu.get_center(*points)
         self.alignment = rotation
         Boid.flock.append(self)
 
-    def update_coords(self):
-        x0, y0 = self.p1
-        x1, y1 = self.p2
-        x2, y2 = self.p3
-        self.center = self.get_center(x0, y0, x1, y1, x2, y2)
-        self.cnv.coords(self.id, x0, y0, x1, y1, x2, y2)
+    def __repr__(self):
+        return f"al: {self.alignment:.2} cent: ({self.center[0]:.2f}, {self.center[0]:.2f})"
 
     def unobserved_sector(self, xc, yc):
         xs = xc + self.view_dist * cos(Boid.view_angle / 2)
@@ -46,63 +44,73 @@ class Boid(object):
         unobserved = self.unobserved_sector(*self.center)
         for boid in boids:
             r = self.get_distance(boid)
-            if r < Boid.view_dist and not Boid.point_in_sector(boid.center, unobserved):
+            if r < Boid.view_dist and not bu.point_in_sector(boid.center, unobserved):
                 obs_boids.append(boid)
         return obs_boids
-
-    def get_rand_rotation(self):
-        rand = random.random()
-        if rand > 0.9:
-            angle = random.uniform(-0.1, 0.1)
-            self.alignment += angle
 
     def rotate(self, angle):
         xc, yc = self.center
         self.alignment += angle
-        self.p1 = (xc + self.size[0] / 2 * cos(pi / 2 + angle),
-                   yc - self.size[0] / 2 * sin(pi / 2 + angle))
-        self.p2 = (xc + self.size[0] / 2 * cos(-pi / 2 + angle),
-                   yc - self.size[0] / 2 * sin(-pi / 2 + angle))
-        self.p3 = (xc + self.size[1] * cos(angle),
-                   yc - self.size[1] * sin(angle))
+        if self.alignment > 2 * pi:
+            self.alignment -= 2 * pi
+        if self.alignment < -2 * pi:
+            self.alignment += 2 * pi
+
+        self.p1 = (xc + self.size[0] / 2 * cos(pi / 2 + self.alignment),
+                   yc + self.size[0] / 2 * sin(pi / 2 + self.alignment))
+        self.p2 = (xc + self.size[0] / 2 * cos(-pi / 2 + self.alignment),
+                   yc + self.size[0] / 2 * sin(-pi / 2 + self.alignment))
+        self.p3 = (xc + self.size[1] * cos(self.alignment),
+                   yc + self.size[1] * sin(self.alignment))
         self.update_coords()
+
+    def update_coords(self):
+        x0, y0 = self.p1
+        x1, y1 = self.p2
+        x2, y2 = self.p3
+        self.center = bu.get_center(x0, y0, x1, y1, x2, y2)
+        self.cnv.coords(self.id, x0, y0, x1, y1, x2, y2)
+
+    @staticmethod
+    def get_next_point(point, dx, dy):
+        x = point[0] + dx
+        y = point[1] + dy
+        return x, y
 
     def move(self):
         width = self.cnv.winfo_width()
         height = self.cnv.winfo_height()
 
-        self.get_rand_rotation()
+        rotation = bu.get_rand_rotation()
+        if rotation != 0.0:
+            self.rotate(rotation)
+
         dx = self.speed * cos(self.alignment)
         dy = self.speed * sin(self.alignment)
-        x1 = self.p1[0] + dx
-        y1 = self.p1[1] + dy
-        x2 = self.p2[0] + dx
-        y2 = self.p2[1] + dy
-        x3 = self.p3[0] + dx
-        y3 = self.p3[1] + dy
 
-        if x3 >= width:
-            x1 = -Boid.size[1]
-            x2 = -Boid.size[1]
-            x3 = 0
-        elif x3 <= 0:
-            x1 = width + Boid.size[1]
-            x2 = width + Boid.size[1]
-            x3 = width
+        x1, y1 = Boid.get_next_point(self.p1, dx, dy)
+        x2, y2 = Boid.get_next_point(self.p2, dx, dy)
+        x3, y3 = Boid.get_next_point(self.p3, dx, dy)
 
-        if y3 >= height:
-            y1 = -Boid.size[1]
-            y2 = -Boid.size[1]
-            y3 = 0
-        elif y3 <= 0:
-            y1 = height + Boid.size[1]
-            y2 = height + Boid.size[1]
-            y3 = height
+        x1, x2, x3 = Boid.check_wraparound(x1, x2, x3, width)
+        y1, y2, y3 = Boid.check_wraparound(y1, y2, y3, height)
 
         self.p1 = x1, y1
         self.p2 = x2, y2
         self.p3 = x3, y3
         self.update_coords()
+
+    @classmethod
+    def check_wraparound(cls, p1, p2, p3, border_pos):
+        if p3 >= border_pos:
+            p1 = -Boid.size[1]
+            p2 = -Boid.size[1]
+            p3 = 0
+        elif p3 <= 0:
+            p1 = border_pos + Boid.size[1]
+            p2 = border_pos + Boid.size[1]
+            p3 = border_pos
+        return p1, p2, p3
 
     @classmethod
     def init_rand_boid(cls, canvas, c_width, c_height):
@@ -121,28 +129,20 @@ class Boid(object):
     def set_colour(cls, colour):
         cls.colour = colour
 
-    @staticmethod
-    def get_center(*points):
-        return 1 / 3 * sum(points[::2]), 1 / 3 * sum(points[1::2])
+    # def align(boid, all_boids):
+    #     neighbours = boid.get_boids_in_view(all_boids)
+    #     angle = 0.0
+    #     for b in neighbours:
+    #         angle += b.alignment
+    #     angle /= len(neighbours)
+    #     boid.alignment = angle
 
-    @staticmethod
-    def sign(point, l_start, l_end):
-        return (point[0] - l_end[0]) * (l_start[1] - l_end[1]) - (l_start[0] - l_end[0]) * (point[1] - l_end[1])
+    # print(f"al:{self.alignment}, c:{self.center} p1: {self.p1}, p2: {self.p2:}, p3: {self.p3:}")
 
-    @staticmethod
-    def point_in_sector(point, sector):
-        x1, y1, x2, y2, x3, y3 = sector
-        s1 = Boid.sign(point, (x1, y1), (x2, y2))
-        s2 = Boid.sign(point, (x2, y2), (x3, y3))
-        s3 = Boid.sign(point, (x3, y3), (x1, y1))
-        negative = (s1 < 0) or (s2 < 0) or (s3 < 0)
-        positive = (s1 > 0) or (s2 > 0) or (s3 > 0)
-        return not (negative and positive)
-
-# def align(boid, all_boids):
-#     neighbours = boid.get_boids_in_view(all_boids)
-#     angle = 0.0
-#     for b in neighbours:
-#         angle += b.alignment
-#     angle /= len(neighbours)
-#     boid.alignment = angle
+    # def r_left(self, event=None):
+    #     angle = -pi / 6
+    #     self.rotate(angle)
+    #
+    # def r_right(self, event=None):
+    #     angle = pi / 6
+    #     self.rotate(angle)
