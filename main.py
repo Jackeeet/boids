@@ -5,7 +5,7 @@ from boid import Boid
 height = 600
 width = 800
 bgc = "#292841"
-boid_count = 50
+boid_count = 100
 
 
 class App(object):
@@ -21,7 +21,7 @@ class App(object):
         self.root.update()
         for boid in self.boids:
             boid.move()
-        self.root.after(12, self.animation)
+        self.root.after(100, self.animation)
 
     def init_boids(self, count, c_width, c_height):
         boids = []
