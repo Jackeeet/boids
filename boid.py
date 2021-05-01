@@ -42,14 +42,15 @@ class Boid:
         width = self.cnv.winfo_width()
         height = self.cnv.winfo_height()
 
-        observed = self._get_boids_in_view(Boid.flock)
+        observed, distances = self._get_boids_in_view(Boid.flock)
         if not observed:
             rotation = bu.get_rand_rotation()
             if rotation != 0.0:
                 self.rotate(rotation)
         else:
+            self._avoid(observed)
             self._align(observed)
-            self._target_group_center(observed)
+            self._target_center(observed)
 
         dx = self.speed * cos(self.alignment)
         dy = self.speed * sin(self.alignment)
@@ -74,9 +75,13 @@ class Boid:
         self.rotate(angle / Boid.angle_divisor)
 
     def _avoid(self, observed):
-        pass
+        centers = [boid.center for boid in observed]
+        x_sum = -1 * sum([point[0] for point in centers])
+        y_sum = -1 * sum([point[1] for point in centers])
+        angle = atan2(y_sum, x_sum)
+        self.rotate(angle / Boid.angle_divisor)
 
-    def _target_group_center(self, observed):
+    def _target_center(self, observed):
         centers = [boid.center for boid in observed]
         count = len(observed)
         x_sum = sum([point[0] for point in centers])
@@ -100,12 +105,14 @@ class Boid:
 
     def _get_boids_in_view(self, boids):
         obs_boids = []
+        distances = []
         unobserved = self._unobserved_sector(*self.center)
         for boid in boids:
             r = self._get_distance(boid)
             if r < Boid.view_dist and not bu.point_in_sector(boid.center, unobserved):
                 obs_boids.append(boid)
-        return obs_boids
+                distances.append(r)
+        return obs_boids, distances
 
     def _update_alignment(self, angle):
         self.alignment += angle
