@@ -186,7 +186,3 @@ class Boid:
         x3 = xc + cls.size[1] * cos(r)
         y3 = yc - cls.size[1] * sin(r)
         return Boid(canvas, r, x1, y1, x2, y2, x3, y3, fill=cls.colour)
-
-    @classmethod
-    def set_colour(cls, colour):
-        cls.colour = colour
