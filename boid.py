@@ -1,4 +1,4 @@
-import random
+from random import random, randint, uniform
 from math import pi, cos, sin, sqrt, atan2
 
 
@@ -7,10 +7,10 @@ class Boid:
     size = (10, 24)
     colour = "white"
     view_dist = 100
-    view_angle = 5 * pi / 6
     sep_dist = 50
-    flock = []
-    angle_divisor = 5
+    _view_angle = 5 * pi / 6
+    _flock = []
+    _angle_divisor = 5
 
     def __init__(self, cnv, rotation=0.0, *points, **kwargs):
         self.cnv = cnv
@@ -20,10 +20,10 @@ class Boid:
         self.p3 = (points[4], points[5])
         self.center = Boid._get_center(*points)
         self.alignment = rotation
-        Boid.flock.append(self)
+        Boid._flock.append(self)
 
     def __repr__(self):
-        return f"al: {self.alignment:.2} cent: ({self.center[0]:.2f}, {self.center[1]:.2f})"
+        return f"align: {self.alignment:.2} cent: ({self.center[0]:.2f}, {self.center[1]:.2f})"
 
     def move(self):
         width = self.cnv.winfo_width()
@@ -52,7 +52,7 @@ class Boid:
         return x1, x2, x3, y1, y2, y3
 
     def _realign(self):
-        observed = self._get_boids_in_view(Boid.flock)
+        observed = self._get_boids_in_view(Boid._flock)
         if not observed:
             rotation = Boid._get_rand_rotation()
             if rotation != 0.0:
@@ -67,14 +67,14 @@ class Boid:
         x_sum = -1 * sum([point[0] for point in centers])
         y_sum = -1 * sum([point[1] for point in centers])
         angle = atan2(y_sum, x_sum)
-        self._rotate(angle / Boid.angle_divisor)
+        self._rotate(angle / Boid._angle_divisor)
 
     def _align(self, observed):
         aligns = [boid.alignment for boid in observed]
         x_sum = sum([cos(align) for align in aligns])
         y_sum = sum([sin(align) for align in aligns])
         angle = atan2(y_sum, x_sum)
-        self._rotate(angle / Boid.angle_divisor)
+        self._rotate(angle / Boid._angle_divisor)
 
     def _target_center(self, observed):
         centers = [boid.center for boid in observed]
@@ -83,7 +83,7 @@ class Boid:
         y_sum = sum([point[1] for point in centers])
         gc = (x_sum / count, y_sum / count)
         angle = atan2(gc[1], gc[0]) - self.alignment
-        self._rotate(angle / Boid.angle_divisor)
+        self._rotate(angle / Boid._angle_divisor)
 
     def _rotate(self, angle):
         self._update_alignment(angle)
@@ -97,10 +97,10 @@ class Boid:
         self._redraw_boid()
 
     def _get_unobserved_sector(self, xc, yc):
-        xs = xc + self.view_dist * cos(Boid.view_angle / 2)
-        ys = yc - self.view_dist * sin(Boid.view_angle / 2)
-        xe = xc + self.view_dist * cos(-Boid.view_angle / 2)
-        ye = yc - self.view_dist * sin(-Boid.view_angle / 2)
+        xs = xc + self.view_dist * cos(Boid._view_angle / 2)
+        ys = yc - self.view_dist * sin(Boid._view_angle / 2)
+        xe = xc + self.view_dist * cos(-Boid._view_angle / 2)
+        ye = yc - self.view_dist * sin(-Boid._view_angle / 2)
         return xs, ys, xc, yc, xe, ye
 
     def _get_distance(self, other):
@@ -158,8 +158,8 @@ class Boid:
     @staticmethod
     def _get_rand_rotation():
         max_angle = 0.1
-        rand = random.random()
-        angle = random.uniform(-max_angle, max_angle) if rand > 0.9 else 0.0
+        rand = random()
+        angle = uniform(-max_angle, max_angle) if rand > 0.9 else 0.0
         return angle
 
     @classmethod
@@ -176,9 +176,9 @@ class Boid:
 
     @classmethod
     def init_rand_boid(cls, canvas, c_width, c_height):
-        r = random.uniform(0.0, 2 * pi)
-        xc = random.randint(0, c_width)
-        yc = random.randint(0, c_height)
+        r = uniform(0.0, 2 * pi)
+        xc = randint(0, c_width)
+        yc = randint(0, c_height)
         x1 = xc + cls.size[0] / 2 * cos(pi / 2 + r)
         y1 = yc - cls.size[0] / 2 * sin(pi / 2 + r)
         x2 = xc + cls.size[0] / 2 * cos(-pi / 2 + r)
