@@ -1,13 +1,17 @@
 from random import random, randint, uniform
 from math import pi, cos, sin, sqrt, atan2
+from collections import namedtuple
+
+Point = namedtuple("Point", "x y")
+Size = namedtuple("Size", "width length")
 
 
 class Boid:
     speed = 10
-    size = (10, 24)
+    size = Size(10, 24)
     colour = "white"
     view_dist = 100
-    sep_dist = 50
+    sep_dist = 100
     _view_angle = 5 * pi / 6
     _flock = []
     _angle_divisor = 5
@@ -15,9 +19,9 @@ class Boid:
     def __init__(self, cnv, rotation=0.0, *points, **kwargs):
         self.cnv = cnv
         self.id = cnv.create_polygon(*points, **kwargs)
-        self.p1 = (points[0], points[1])
-        self.p2 = (points[2], points[3])
-        self.p3 = (points[4], points[5])
+        self.p1 = Point(points[0], points[1])
+        self.p2 = Point(points[2], points[3])
+        self.p3 = Point(points[4], points[5])
         self.center = Boid._get_center(*points)
         self.alignment = rotation
         Boid._flock.append(self)
@@ -35,9 +39,9 @@ class Boid:
 
     def _update_coords(self, x1, x2, x3, y1, y2, y3):
         self.center = Boid._get_center(x1, y1, x2, y2, x3, y3)
-        self.p1 = x1, y1
-        self.p2 = x2, y2
-        self.p3 = x3, y3
+        self.p1 = Point(x1, y1)
+        self.p2 = Point(x2, y2)
+        self.p3 = Point(x3, y3)
 
     def _get_coords(self, width, height):
         dx = self.speed * cos(self.alignment)
@@ -64,8 +68,8 @@ class Boid:
 
     def _avoid(self, observed):
         centers = [boid.center for boid in observed]
-        x_sum = -1 * sum([point[0] for point in centers])
-        y_sum = -1 * sum([point[1] for point in centers])
+        x_sum = -1 * sum([point.x for point in centers])
+        y_sum = -1 * sum([point.y for point in centers])
         angle = atan2(y_sum, x_sum)
         self._rotate(angle / Boid._angle_divisor)
 
@@ -79,8 +83,8 @@ class Boid:
     def _target_center(self, observed):
         centers = [boid.center for boid in observed]
         count = len(observed)
-        x_sum = sum([point[0] for point in centers])
-        y_sum = sum([point[1] for point in centers])
+        x_sum = sum([point.x for point in centers])
+        y_sum = sum([point.y for point in centers])
         gc = (x_sum / count, y_sum / count)
         angle = atan2(gc[1], gc[0]) - self.alignment
         self._rotate(angle / Boid._angle_divisor)
@@ -88,30 +92,30 @@ class Boid:
     def _rotate(self, angle):
         self._update_alignment(angle)
         xc, yc = self.center
-        self.p1 = (xc + self.size[0] / 2 * cos(pi / 2 + self.alignment),
-                   yc + self.size[0] / 2 * sin(pi / 2 + self.alignment))
-        self.p2 = (xc + self.size[0] / 2 * cos(-pi / 2 + self.alignment),
-                   yc + self.size[0] / 2 * sin(-pi / 2 + self.alignment))
-        self.p3 = (xc + self.size[1] * cos(self.alignment),
-                   yc + self.size[1] * sin(self.alignment))
+        self.p1 = Point(xc + self.size.width / 2 * cos(pi / 2 + self.alignment),
+                        yc + self.size.width / 2 * sin(pi / 2 + self.alignment))
+        self.p2 = Point(xc + self.size.width / 2 * cos(-pi / 2 + self.alignment),
+                        yc + self.size.width / 2 * sin(-pi / 2 + self.alignment))
+        self.p3 = Point(xc + self.size.length * cos(self.alignment),
+                        yc + self.size.length * sin(self.alignment))
         self._redraw_boid()
 
-    def _get_unobserved_sector(self, xc, yc):
-        xs = xc + self.view_dist * cos(Boid._view_angle / 2)
-        ys = yc - self.view_dist * sin(Boid._view_angle / 2)
-        xe = xc + self.view_dist * cos(-Boid._view_angle / 2)
-        ye = yc - self.view_dist * sin(-Boid._view_angle / 2)
-        return xs, ys, xc, yc, xe, ye
+    def _get_unobserved_sector(self):
+        xs = self.center.x + self.view_dist * cos(Boid._view_angle / 2)
+        ys = self.center.y - self.view_dist * sin(Boid._view_angle / 2)
+        xe = self.center.x + self.view_dist * cos(-Boid._view_angle / 2)
+        ye = self.center.y - self.view_dist * sin(-Boid._view_angle / 2)
+        return Point(xs, ys), self.center, Point(xe, ye)
 
     def _get_distance(self, other):
         sc = self.center
         oc = other.center
-        r = (sc[0] - oc[0]) ** 2 + (sc[1] - oc[1]) ** 2
+        r = (sc.x - oc.x) ** 2 + (sc.y - oc.y) ** 2
         return sqrt(r)
 
     def _get_boids_in_view(self, boids):
         obs_boids = []
-        unobserved = self._get_unobserved_sector(*self.center)
+        unobserved = self._get_unobserved_sector()
         for boid in boids:
             r = self._get_distance(boid)
             if r < Boid.view_dist and not Boid._point_in_sector(boid.center, unobserved):
@@ -133,26 +137,26 @@ class Boid:
 
     @staticmethod
     def _get_next_point(point, dx, dy):
-        x = point[0] + dx
-        y = point[1] + dy
-        return x, y
+        x = point.x + dx
+        y = point.y + dy
+        return Point(x, y)
 
     @staticmethod
     def _get_center(*points):
-        return 1 / 3 * sum(points[::2]), 1 / 3 * sum(points[1::2])
+        return Point(1 / 3 * sum(points[::2]), 1 / 3 * sum(points[1::2]))
 
     @staticmethod
     def _sign(point, l_start, l_end):
-        return (point[0] - l_end[0]) * (l_start[1] - l_end[1]) - (l_start[0] - l_end[0]) * (point[1] - l_end[1])
+        return (point.x - l_end.x) * (l_start.y - l_end.y) - (l_start.x - l_end.x) * (point.y - l_end.y)
 
     @staticmethod
     def _point_in_sector(point, sector):
-        x1, y1, x2, y2, x3, y3 = sector
-        s1 = Boid._sign(point, (x1, y1), (x2, y2))
-        s2 = Boid._sign(point, (x2, y2), (x3, y3))
-        s3 = Boid._sign(point, (x3, y3), (x1, y1))
-        negative = (s1 < 0) or (s2 < 0) or (s3 < 0)
-        positive = (s1 > 0) or (s2 > 0) or (s3 > 0)
+        point1, point2, point3 = sector
+        sign1 = Boid._sign(point, point1, point2)
+        sign2 = Boid._sign(point, point2, point3)
+        sign3 = Boid._sign(point, point3, point1)
+        negative = (sign1 < 0) or (sign2 < 0) or (sign3 < 0)
+        positive = (sign1 > 0) or (sign2 > 0) or (sign3 > 0)
         return not (negative and positive)
 
     @staticmethod
@@ -165,12 +169,12 @@ class Boid:
     @classmethod
     def _check_wraparound(cls, p1, p2, p3, border_pos):
         if p3 >= border_pos:
-            p1 = -Boid.size[1]
-            p2 = -Boid.size[1]
+            p1 = -Boid.size.length
+            p2 = -Boid.size.length
             p3 = 0
         elif p3 <= 0:
-            p1 = border_pos + Boid.size[1]
-            p2 = border_pos + Boid.size[1]
+            p1 = border_pos + Boid.size.length
+            p2 = border_pos + Boid.size.length
             p3 = border_pos
         return p1, p2, p3
 
@@ -179,10 +183,10 @@ class Boid:
         r = uniform(0.0, 2 * pi)
         xc = randint(0, c_width)
         yc = randint(0, c_height)
-        x1 = xc + cls.size[0] / 2 * cos(pi / 2 + r)
-        y1 = yc - cls.size[0] / 2 * sin(pi / 2 + r)
-        x2 = xc + cls.size[0] / 2 * cos(-pi / 2 + r)
-        y2 = yc - cls.size[0] / 2 * sin(-pi / 2 + r)
-        x3 = xc + cls.size[1] * cos(r)
-        y3 = yc - cls.size[1] * sin(r)
+        x1 = xc + cls.size.width / 2 * cos(pi / 2 + r)
+        y1 = yc - cls.size.width / 2 * sin(pi / 2 + r)
+        x2 = xc + cls.size.width / 2 * cos(-pi / 2 + r)
+        y2 = yc - cls.size.width / 2 * sin(-pi / 2 + r)
+        x3 = xc + cls.size.length * cos(r)
+        y3 = yc - cls.size.length * sin(r)
         return Boid(canvas, r, x1, y1, x2, y2, x3, y3, fill=cls.colour)
