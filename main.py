@@ -10,7 +10,7 @@ class App(object):
     _width = 800
     _bgc = "#292841"
     _boids = []
-    _frame_length = 100
+    _frame_length = 50
 
     def __init__(self, app_root):
         self.root = app_root
@@ -29,7 +29,8 @@ class App(object):
         self.in_view.set(Boid.view_dist)
         self.in_view.grid(row=0, column=5, padx=5)
 
-        self.in_sep = tk.Scale(self.toolbar, from_=10, to=500, width=10, orient=tk.HORIZONTAL)
+        self.in_sep = tk.Scale(self.toolbar, from_=10, to=500, width=10, orient=tk.HORIZONTAL,
+                               command=self._on_sep_change)
         self.in_sep.set(Boid.sep_dist)
         self.in_sep.grid(row=0, column=7, padx=5)
 
@@ -39,6 +40,12 @@ class App(object):
         self.toolbar.pack()
         self.cnv = tk.Canvas(self.root, bg=App._bgc, height=App._height, width=App._width)
         self.cnv.pack()
+
+    def _on_sep_change(self, value):
+        value = int(value)
+        view = int(self.in_view.get())
+        if value > view:
+            self.in_sep.set(view)
 
     def _animate(self):
         self.root.update()

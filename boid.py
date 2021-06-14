@@ -11,17 +11,19 @@ class Boid:
     size = Size(10, 24)
     colour = "white"
     view_dist = 100
-    sep_dist = 100
+    sep_dist = 80
     _view_angle = 5 * pi / 6
     _flock = []
     _angle_divisor = 5
 
     def __init__(self, cnv, rotation=0.0, *points, **kwargs):
         self.cnv = cnv
-        self.id = cnv.create_polygon(*points, **kwargs)
-        self.p1 = Point(points[0], points[1])
-        self.p2 = Point(points[2], points[3])
-        self.p3 = Point(points[4], points[5])
+        self._id = cnv.create_polygon(*points, **kwargs)
+        self._min_bounds = Point(0, 0)
+        self._max_bounds = Point(cnv.winfo_width(), cnv.winfo_height())
+        self._p1 = Point(points[0], points[1])
+        self._p2 = Point(points[2], points[3])
+        self._p3 = Point(points[4], points[5])
         self.center = Boid._get_center(*points)
         self.alignment = rotation
         Boid._flock.append(self)
@@ -30,29 +32,27 @@ class Boid:
         return f"align: {self.alignment:.2} cent: ({self.center[0]:.2f}, {self.center[1]:.2f})"
 
     def move(self):
-        width = self.cnv.winfo_width()
-        height = self.cnv.winfo_height()
         self._realign()
-        x1, x2, x3, y1, y2, y3 = self._get_coords(width, height)
-        self._update_coords(x1, x2, x3, y1, y2, y3)
+        self._update_coords(self._get_coords())
         self._redraw_boid()
 
-    def _update_coords(self, x1, x2, x3, y1, y2, y3):
+    def _update_coords(self, coords):
+        x1, x2, x3, y1, y2, y3 = coords
         self.center = Boid._get_center(x1, y1, x2, y2, x3, y3)
-        self.p1 = Point(x1, y1)
-        self.p2 = Point(x2, y2)
-        self.p3 = Point(x3, y3)
+        self._p1 = Point(x1, y1)
+        self._p2 = Point(x2, y2)
+        self._p3 = Point(x3, y3)
 
-    def _get_coords(self, width, height):
+    def _get_coords(self):
         dx = self.speed * cos(self.alignment)
         dy = self.speed * sin(self.alignment)
 
-        x1, y1 = Boid._get_next_point(self.p1, dx, dy)
-        x2, y2 = Boid._get_next_point(self.p2, dx, dy)
-        x3, y3 = Boid._get_next_point(self.p3, dx, dy)
+        x1, y1 = Boid._get_next_point(self._p1, dx, dy)
+        x2, y2 = Boid._get_next_point(self._p2, dx, dy)
+        x3, y3 = Boid._get_next_point(self._p3, dx, dy)
 
-        x1, x2, x3 = Boid._check_wraparound(x1, x2, x3, width)
-        y1, y2, y3 = Boid._check_wraparound(y1, y2, y3, height)
+        x1, x2, x3 = Boid._check_wraparound(x1, x2, x3, self._max_bounds.x)
+        y1, y2, y3 = Boid._check_wraparound(y1, y2, y3, self._max_bounds.y)
         return x1, x2, x3, y1, y2, y3
 
     def _realign(self):
@@ -67,7 +67,7 @@ class Boid:
             self._target_center(observed)
 
     def _avoid(self, observed):
-        centers = [boid.center for boid in observed]
+        centers = [boid.center for boid in observed if self._get_distance(boid) <= self.sep_dist]
         x_sum = -1 * sum([point.x for point in centers])
         y_sum = -1 * sum([point.y for point in centers])
         angle = atan2(y_sum, x_sum)
@@ -78,6 +78,7 @@ class Boid:
         x_sum = sum([cos(align) for align in aligns])
         y_sum = sum([sin(align) for align in aligns])
         angle = atan2(y_sum, x_sum)
+        # angle = sum(align for align in aligns) / len(observed)
         self._rotate(angle / Boid._angle_divisor)
 
     def _target_center(self, observed):
@@ -85,19 +86,19 @@ class Boid:
         count = len(observed)
         x_sum = sum([point.x for point in centers])
         y_sum = sum([point.y for point in centers])
-        gc = (x_sum / count, y_sum / count)
-        angle = atan2(gc[1], gc[0]) - self.alignment
+        groupcenter = (x_sum / count, y_sum / count)
+        angle = atan2(groupcenter[1], groupcenter[0]) - self.alignment
         self._rotate(angle / Boid._angle_divisor)
 
     def _rotate(self, angle):
-        self._update_alignment(angle)
+        self.alignment += angle
         xc, yc = self.center
-        self.p1 = Point(xc + self.size.width / 2 * cos(pi / 2 + self.alignment),
-                        yc + self.size.width / 2 * sin(pi / 2 + self.alignment))
-        self.p2 = Point(xc + self.size.width / 2 * cos(-pi / 2 + self.alignment),
-                        yc + self.size.width / 2 * sin(-pi / 2 + self.alignment))
-        self.p3 = Point(xc + self.size.length * cos(self.alignment),
-                        yc + self.size.length * sin(self.alignment))
+        self._p1 = Point(xc + self.size.width / 2 * cos(pi / 2 + self.alignment),
+                         yc + self.size.width / 2 * sin(pi / 2 + self.alignment))
+        self._p2 = Point(xc + self.size.width / 2 * cos(-pi / 2 + self.alignment),
+                         yc + self.size.width / 2 * sin(-pi / 2 + self.alignment))
+        self._p3 = Point(xc + self.size.length * cos(self.alignment),
+                         yc + self.size.length * sin(self.alignment))
         self._redraw_boid()
 
     def _get_unobserved_sector(self):
@@ -122,18 +123,11 @@ class Boid:
                 obs_boids.append(boid)
         return obs_boids
 
-    def _update_alignment(self, angle):
-        self.alignment += angle
-        if self.alignment > 2 * pi:
-            self.alignment -= 2 * pi
-        if self.alignment < -2 * pi:
-            self.alignment += 2 * pi
-
     def _redraw_boid(self):
-        x0, y0 = self.p1
-        x1, y1 = self.p2
-        x2, y2 = self.p3
-        self.cnv.coords(self.id, x0, y0, x1, y1, x2, y2)
+        x0, y0 = self._p1
+        x1, y1 = self._p2
+        x2, y2 = self._p3
+        self.cnv.coords(self._id, x0, y0, x1, y1, x2, y2)
 
     @staticmethod
     def _get_next_point(point, dx, dy):
@@ -190,3 +184,45 @@ class Boid:
         x3 = xc + cls.size.length * cos(r)
         y3 = yc - cls.size.length * sin(r)
         return Boid(canvas, r, x1, y1, x2, y2, x3, y3, fill=cls.colour)
+
+    # def write_info(self):
+    #     if not Boid._flock.index(self) == 0:
+    #         return
+    #
+    #     if Boid._itercount > 100:
+    #         return
+    #
+    #     if Boid._itercount == 0:
+    #         with open("aligns.txt", "w") as f:
+    #             f.write(f"Iteration 0\n")
+    #             for boid in Boid._flock:
+    #                 al = round(boid.alignment, 2)
+    #                 s = f"{al:,.2f}\n"
+    #                 f.write(s)
+    #     else:
+    #         with open("aligns.txt", "a") as f:
+    #             f.write(f"Iteration {Boid._itercount}\n")
+    #             for boid in Boid._flock:
+    #                 al = round(boid.alignment, 2)
+    #                 s = f"{al:,.2f}\n"
+    #                 f.write(s)
+    #     Boid._itercount += 1
+
+    # @classmethod
+    # def write_pos(cls):
+    #     if Boid._itercount > 200:
+    #         return
+    #
+    #     boid = Boid._flock[0]
+    #     if Boid._itercount == 0:
+    #         with open("pos.txt", "w") as f:
+    #             s = f"{boid.center.x:,.2f}, {boid.center.y:,.2f}\n{boid.p1.x:,.2f}, {boid.p1.y:,.2f}\n{boid.p2.x:,.2f}, {boid.p2.y:,.2f}\n{boid.p3.x:,.2f}, {boid.p3.y:,.2f}\n"
+    #             f.write(s)
+    #             f.write(f"al:{boid.alignment}")
+    #     else:
+    #         with open("pos.txt", "a") as f:
+    #             f.write(f"\n")
+    #             s = f"{boid.center.x:,.2f}, {boid.center.y:,.2f}\n{boid.p1.x:,.2f}, {boid.p1.y:,.2f}\n{boid.p2.x:,.2f}, {boid.p2.y:,.2f}\n{boid.p3.x:,.2f}, {boid.p3.y:,.2f}\n"
+    #             f.write(s)
+    #             f.write(f"al:{boid.alignment}")
+    #     Boid._itercount += 1
